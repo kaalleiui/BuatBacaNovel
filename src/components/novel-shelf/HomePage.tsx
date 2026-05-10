@@ -1,23 +1,34 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, ChevronRight, Sparkles } from 'lucide-react';
 import { useNovelShelfStore } from '@/lib/store';
+import { novelsApi, type NovelWithUser } from '@/lib/api';
 import { EmptyState } from './EmptyState';
 
 export function HomePage() {
-  const { novels, chapters, authorName, navigate } = useNovelShelfStore();
+  const { navigate, user } = useNovelShelfStore();
+  const [novels, setNovels] = useState<NovelWithUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const recentNovels = [...novels].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  ).slice(0, 6);
+  useEffect(() => {
+    novelsApi.list()
+      .then((data) => setNovels(data.novels))
+      .catch(() => setNovels([]))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const novelsWithChapters = novels.map((n) => ({
-    ...n,
-    chapterCount: chapters.filter((c) => c.novelId === n.id).length,
-  }));
+  const recentNovels = novels.slice(0, 6);
+  const totalChapters = novels.reduce((sum, n) => sum + (n._count?.chapters || 0), 0);
 
-  const totalChapters = chapters.length;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-20">
@@ -29,7 +40,7 @@ export function HomePage() {
           transition={{ duration: 0.4 }}
         >
           <p className="text-muted-foreground text-sm">Selamat datang,</p>
-          <h1 className="text-2xl font-bold text-foreground mt-1">{authorName} ✨</h1>
+          <h1 className="text-2xl font-bold text-foreground mt-1">{user?.nickname || 'Penulis'} ✨</h1>
         </motion.div>
       </div>
 
@@ -78,49 +89,40 @@ export function HomePage() {
                 </button>
               </div>
               <div className="flex gap-4 px-5 overflow-x-auto pb-2 scrollbar-hide">
-                {recentNovels.map((novel, i) => {
-                  const chapterCount = chapters.filter((c) => c.novelId === novel.id).length;
-                  return (
-                    <motion.button
-                      key={novel.id}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.08 }}
-                      onClick={() => navigate('novel-detail', novel.id)}
-                      className="flex-shrink-0 group"
-                    >
-                      <div className="w-28">
-                        {/* Book Cover */}
-                        <div
-                          className="w-28 h-40 rounded-xl shadow-md group-hover:shadow-lg transition-shadow overflow-hidden relative"
-                          style={{ backgroundColor: novel.coverColor || '#C67B3C' }}
-                        >
-                          {novel.coverImage ? (
-                            <img
-                              src={novel.coverImage}
-                              alt={novel.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center p-3">
-                              <span className="text-white/90 font-bold text-center text-sm leading-tight line-clamp-3 drop-shadow-md">
-                                {novel.title}
-                              </span>
-                            </div>
-                          )}
-                          {/* Book spine effect */}
-                          <div className="absolute left-0 top-0 bottom-0 w-2 bg-black/10 rounded-l-xl" />
-                        </div>
-                        <p className="text-xs font-medium text-foreground mt-2 line-clamp-1 text-left">
-                          {novel.title}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground text-left">
-                          {chapterCount} Bab
-                        </p>
+                {recentNovels.map((novel, i) => (
+                  <motion.button
+                    key={novel.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    onClick={() => navigate('novel-detail', novel.id)}
+                    className="flex-shrink-0 group"
+                  >
+                    <div className="w-28">
+                      <div
+                        className="w-28 h-40 rounded-xl shadow-md group-hover:shadow-lg transition-shadow overflow-hidden relative"
+                        style={{ backgroundColor: novel.coverColor || '#C67B3C' }}
+                      >
+                        {novel.coverImage ? (
+                          <img src={novel.coverImage} alt={novel.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center p-3">
+                            <span className="text-white/90 font-bold text-center text-sm leading-tight line-clamp-3 drop-shadow-md">
+                              {novel.title}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute left-0 top-0 bottom-0 w-2 bg-black/10 rounded-l-xl" />
                       </div>
-                    </motion.button>
-                  );
-                })}
+                      <p className="text-xs font-medium text-foreground mt-2 line-clamp-1 text-left">
+                        {novel.title}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground text-left">
+                        {novel._count?.chapters || 0} Bab
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
               </div>
             </div>
           )}
@@ -129,46 +131,41 @@ export function HomePage() {
           <div className="px-5">
             <h2 className="text-lg font-semibold text-foreground mb-3">Novel Terbaru</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {recentNovels.map((novel, i) => {
-                const chapterCount = chapters.filter((c) => c.novelId === novel.id).length;
-                return (
-                  <motion.button
-                    key={novel.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => navigate('novel-detail', novel.id)}
-                    className="text-left group"
+              {recentNovels.map((novel, i) => (
+                <motion.button
+                  key={novel.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  onClick={() => navigate('novel-detail', novel.id)}
+                  className="text-left group"
+                >
+                  <div
+                    className="aspect-[3/4] rounded-xl shadow-sm group-hover:shadow-md transition-shadow overflow-hidden relative"
+                    style={{ backgroundColor: novel.coverColor || '#C67B3C' }}
                   >
-                    <div
-                      className="aspect-[3/4] rounded-xl shadow-sm group-hover:shadow-md transition-shadow overflow-hidden relative"
-                      style={{ backgroundColor: novel.coverColor || '#C67B3C' }}
-                    >
-                      {novel.coverImage ? (
-                        <img
-                          src={novel.coverImage}
-                          alt={novel.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center p-4">
-                          <span className="text-white/90 font-bold text-center text-sm leading-tight line-clamp-4 drop-shadow-md">
-                            {novel.title}
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-black/10 rounded-l-xl" />
-                      {novel.genre && (
-                        <span className="absolute top-2 right-2 bg-black/20 text-white text-[9px] px-1.5 py-0.5 rounded-full backdrop-blur-sm">
-                          {novel.genre}
+                    {novel.coverImage ? (
+                      <img src={novel.coverImage} alt={novel.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-4">
+                        <span className="text-white/90 font-bold text-center text-sm leading-tight line-clamp-4 drop-shadow-md">
+                          {novel.title}
                         </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium text-foreground mt-2 line-clamp-1">{novel.title}</p>
-                    <p className="text-xs text-muted-foreground">{chapterCount} Bab</p>
-                  </motion.button>
-                );
-              })}
+                      </div>
+                    )}
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-black/10 rounded-l-xl" />
+                    {novel.genre && (
+                      <span className="absolute top-2 right-2 bg-black/20 text-white text-[9px] px-1.5 py-0.5 rounded-full backdrop-blur-sm">
+                        {novel.genre}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-medium text-foreground mt-2 line-clamp-1">{novel.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    oleh {novel.user.nickname} · {novel._count?.chapters || 0} Bab
+                  </p>
+                </motion.button>
+              ))}
             </div>
           </div>
         </>

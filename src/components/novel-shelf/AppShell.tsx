@@ -1,14 +1,17 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, BookOpen, User, Plus } from 'lucide-react';
 import { useNovelShelfStore } from '@/lib/store';
+import { authApi, type AuthUser } from '@/lib/api';
 import { HomePage } from './HomePage';
 import { BookshelfPage } from './BookshelfPage';
 import { NovelDetailPage } from './NovelDetailPage';
 import { ReaderPage } from './ReaderPage';
 import { LoreBookPage } from './LoreBookPage';
 import { ProfilePage } from './ProfilePage';
+import { LoginPage } from './LoginPage';
 import { AddNovelModal } from './AddNovelModal';
 import { AddChapterModal } from './AddChapterModal';
 import { AddLoreModal } from './AddLoreModal';
@@ -21,9 +24,46 @@ const pageVariants = {
 };
 
 export function AppShell() {
-  const { currentView, navigate } = useNovelShelfStore();
+  const { currentView, navigate, user, setUser, isAuthenticated } = useNovelShelfStore();
+  const [loading, setLoading] = useState(true);
 
-  const showBottomNav = !['reader', 'add-novel', 'add-chapter', 'add-lore', 'edit-character'].includes(currentView);
+  // Check session on mount
+  useEffect(() => {
+    authApi.me()
+      .then((data) => {
+        if (data.user) {
+          setUser(data.user as AuthUser);
+        } else {
+          setUser(null);
+        }
+      })
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, [setUser]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  // Show login if not authenticated
+  if (!isAuthenticated && currentView !== 'register') {
+    return (
+      <>
+        <LoginPage />
+        <AddNovelModal />
+      </>
+    );
+  }
+
+  const showBottomNav = !['reader', 'add-novel', 'add-chapter', 'add-lore', 'edit-character', 'login', 'register'].includes(currentView);
 
   const renderView = () => {
     switch (currentView) {
@@ -39,6 +79,10 @@ export function AppShell() {
         return <LoreBookPage />;
       case 'profile':
         return <ProfilePage />;
+      case 'login':
+        return <LoginPage />;
+      case 'register':
+        return <LoginPage />;
       default:
         return <HomePage />;
     }
@@ -49,6 +93,8 @@ export function AppShell() {
     { view: 'bookshelf' as const, icon: BookOpen, label: 'Rak Buku' },
     { view: 'profile' as const, icon: User, label: 'Profil' },
   ];
+
+  const canAddNovel = user && (user.role === 'ADMIN' || user.role === 'WRITER');
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -109,15 +155,17 @@ export function AppShell() {
                 </button>
               );
             })}
-            <button
-              onClick={() => navigate('add-novel')}
-              className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center -mt-4 shadow-lg shadow-primary/30">
-                <Plus className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-[10px] font-medium text-muted-foreground">Tambah</span>
-            </button>
+            {canAddNovel && (
+              <button
+                onClick={() => navigate('add-novel')}
+                className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center -mt-4 shadow-lg shadow-primary/30">
+                  <Plus className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground">Tambah</span>
+              </button>
+            )}
           </div>
         </nav>
       )}

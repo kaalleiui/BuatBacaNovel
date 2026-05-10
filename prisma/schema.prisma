@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,20 +7,143 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================
+// USER & AUTH
+// ============================================
+
+enum UserRole {
+  ADMIN
+  WRITER
+  READER
 }
 
-model Post {
-  id        String   @id @default(cuid())
+model User {
+  id          String   @id @default(cuid())
+  nickname    String   @unique
+  password    String
+  role        UserRole @default(READER)
+  avatarColor String   @default("#C67B3C")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  novels    Novel[]
+  comments  Comment[]
+
+  @@map("users")
+}
+
+// ============================================
+// NOVEL
+// ============================================
+
+enum ReadMode {
+  swipe
+  scroll
+}
+
+model Novel {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  coverColor  String   @default("#C67B3C")
+  coverImage  String?  // file path di /uploads/covers/
+  genre       String   @default("")
+  readMode    ReadMode @default(swipe)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId     String     @map("user_id")
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  chapters   Chapter[]
+  characters Character[]
+  loreEntries LoreEntry[]
+  comments   Comment[]
+
+  @@map("novels")
+}
+
+// ============================================
+// CHAPTER
+// ============================================
+
+model Chapter {
+  id              String   @id @default(cuid())
+  title           String
+  content         String   @default("")
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  novelId         String   @map("novel_id")
+  novel           Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  povCharacterId  String?  @map("pov_character_id")
+  povCharacter    Character? @relation(fields: [povCharacterId], references: [id], onDelete: SetNull)
+
+  @@map("chapters")
+}
+
+// ============================================
+// CHARACTER
+// ============================================
+
+model Character {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  avatarColor String   @default("#C67B3C")
+  theme       String   @default("{\"backgroundColor\":\"#FDF6EC\",\"textColor\":\"#3D2B1F\",\"accentColor\":\"#C67B3C\",\"fontFamily\":\"serif\",\"lineHeight\":\"relaxed\"}")
+
+  novelId     String   @map("novel_id")
+  novel       Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  chapterPOVs Chapter[]
+
+  @@map("characters")
+}
+
+// ============================================
+// LORE ENTRY
+// ============================================
+
+enum LoreCategory {
+  character
+  backstory
+  worldbuilding
+  notes
+}
+
+model LoreEntry {
+  id        String       @id @default(cuid())
   title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  content   String       @default("")
+  category  LoreCategory @default(notes)
+  tags      String       @default("[]") // JSON array stored as string
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  novelId   String       @map("novel_id")
+  novel     Novel        @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  @@map("lore_entries")
+}
+
+// ============================================
+// COMMENT
+// ============================================
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  novelId   String   @map("novel_id")
+  novel     Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  chapterId String?  @map("chapter_id")
+
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
 }

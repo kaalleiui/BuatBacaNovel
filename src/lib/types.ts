@@ -1,3 +1,5 @@
+import type { UserRole, ReadMode, LoreCategory } from '@prisma/client';
+
 export interface POVTheme {
   backgroundColor: string;
   textColor: string;
@@ -6,60 +8,8 @@ export interface POVTheme {
   lineHeight: 'compact' | 'normal' | 'relaxed';
 }
 
-export interface Novel {
-  id: string;
-  title: string;
-  author: string;
-  description: string;
-  coverColor: string;
-  coverImage: string;
-  genre: string;
-  readMode: 'swipe' | 'scroll';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Chapter {
-  id: string;
-  novelId: string;
-  title: string;
-  content: string;
-  povCharacterId: string | null;
-  order: number;
-  createdAt: string;
-}
-
-export interface Character {
-  id: string;
-  novelId: string;
-  name: string;
-  description: string;
-  avatarColor: string;
-  theme: POVTheme;
-}
-
-export interface LoreEntry {
-  id: string;
-  novelId: string;
-  category: 'character' | 'backstory' | 'worldbuilding' | 'notes';
-  title: string;
-  content: string;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type AppView =
-  | 'home'
-  | 'bookshelf'
-  | 'novel-detail'
-  | 'reader'
-  | 'lorebook'
-  | 'profile'
-  | 'add-novel'
-  | 'add-chapter'
-  | 'add-lore'
-  | 'edit-character';
+// Re-export Prisma types for convenience
+export type { UserRole, ReadMode, LoreCategory };
 
 export const GENRES = [
   'Fantasy', 'Romance', 'Sci-Fi', 'Thriller', 'Drama',
@@ -107,3 +57,46 @@ export const COVER_COLORS = [
   '#9B2335', '#2D5F4A', '#3D6B8E', '#6B4E71', '#4A6741',
   '#B5651D', '#CC5500', '#8B0000', '#4A5D23', '#2F4F4F',
 ];
+
+// Helper to parse POV theme from JSON string (stored in DB)
+export function parsePOVTheme(themeJson: string): POVTheme {
+  try {
+    return { ...DEFAULT_POV_THEME, ...JSON.parse(themeJson) };
+  } catch {
+    return { ...DEFAULT_POV_THEME };
+  }
+}
+
+// Helper to serialize POV theme to JSON string (for DB storage)
+export function serializePOVTheme(theme: POVTheme): string {
+  return JSON.stringify(theme);
+}
+
+// Helper to parse tags from JSON string (stored in DB)
+export function parseTags(tagsJson: string): string[] {
+  try {
+    return JSON.parse(tagsJson) as string[];
+  } catch {
+    return [];
+  }
+}
+
+// Helper to serialize tags to JSON string (for DB storage)
+export function serializeTags(tags: string[]): string {
+  return JSON.stringify(tags);
+}
+
+// App navigation views
+export type AppView =
+  | 'home'
+  | 'bookshelf'
+  | 'novel-detail'
+  | 'reader'
+  | 'lorebook'
+  | 'profile'
+  | 'add-novel'
+  | 'add-chapter'
+  | 'add-lore'
+  | 'edit-character'
+  | 'login'
+  | 'register';
