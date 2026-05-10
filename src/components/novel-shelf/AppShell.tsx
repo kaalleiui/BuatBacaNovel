@@ -10,12 +10,15 @@ import { BookshelfPage } from './BookshelfPage';
 import { NovelDetailPage } from './NovelDetailPage';
 import { ReaderPage } from './ReaderPage';
 import { LoreBookPage } from './LoreBookPage';
+import { LoreMapPage } from './LoreMapPage';
 import { ProfilePage } from './ProfilePage';
 import { LoginPage } from './LoginPage';
 import { AddNovelModal } from './AddNovelModal';
 import { AddChapterModal } from './AddChapterModal';
 import { AddLoreModal } from './AddLoreModal';
 import { CharacterEditorModal } from './CharacterEditorModal';
+import { ChapterEditor } from './ChapterEditor';
+import { Toaster } from 'sonner';
 
 const pageVariants = {
   initial: { opacity: 0, x: 20 },
@@ -59,11 +62,12 @@ export function AppShell() {
       <>
         <LoginPage />
         <AddNovelModal />
+        <Toaster position="top-center" />
       </>
     );
   }
 
-  const showBottomNav = !['reader', 'add-novel', 'add-chapter', 'add-lore', 'edit-character', 'login', 'register'].includes(currentView);
+  const showBottomNav = !['reader', 'add-novel', 'add-chapter', 'chapter-editor', 'add-lore', 'edit-character', 'login', 'register', 'lore-map'].includes(currentView);
 
   const renderView = () => {
     switch (currentView) {
@@ -77,6 +81,10 @@ export function AppShell() {
         return <ReaderPage />;
       case 'lorebook':
         return <LoreBookPage />;
+      case 'lore-map':
+        return <LoreMapPage />;
+      case 'chapter-editor':
+        return <ChapterEditor />;
       case 'profile':
         return <ProfilePage />;
       case 'login':
@@ -169,6 +177,8 @@ export function AppShell() {
           </div>
         </nav>
       )}
+
+      <Toaster position="top-center" />
     </div>
   );
 }

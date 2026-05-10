@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { useNovelShelfStore } from '@/lib/store';
 import { chaptersApi, charactersApi } from '@/lib/api';
 import type { CharacterWithTheme } from '@/lib/api';
-import { parsePOVTheme } from '@/lib/types';
 import { toast } from 'sonner';
 
 export function AddChapterModal() {
@@ -31,13 +30,14 @@ export function AddChapterModal() {
     if (!title.trim()) { toast.error('Judul bab wajib diisi'); return; }
     setSaving(true);
     try {
-      await chaptersApi.create(selectedNovelId!, {
+      const result = await chaptersApi.create(selectedNovelId!, {
         title: title.trim(),
         content: content.trim(),
         povCharacterId,
       });
       toast.success('Bab berhasil ditambahkan! ✍️');
-      navigate('novel-detail', selectedNovelId);
+      // Navigate to chapter editor for the new chapter
+      navigate('chapter-editor', selectedNovelId, result.chapter.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Gagal menambah bab');
     } finally {
@@ -75,11 +75,14 @@ export function AddChapterModal() {
                 </div>
               )}
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Konten Bab</label>
-                <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Tulis ceritamu di sini..." rows={12} className="w-full px-3 py-3 rounded-lg bg-background border border-border text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring leading-relaxed" />
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Konten Awal (opsional)</label>
+                <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Tulis konten awal bab, atau edit nanti di editor..." rows={6} className="w-full px-3 py-3 rounded-lg bg-background border border-border text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring leading-relaxed" />
                 <p className="text-xs text-muted-foreground mt-1">{content.split(/\s+/).filter(Boolean).length} kata</p>
               </div>
-              <Button onClick={handleSubmit} className="w-full" size="lg" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Bab'}</Button>
+              <div className="flex gap-2">
+                <Button onClick={handleClose} variant="outline" className="flex-1">Batal</Button>
+                <Button onClick={handleSubmit} className="flex-1" size="lg" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan & Edit'}</Button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

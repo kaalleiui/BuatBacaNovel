@@ -2,13 +2,22 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, BookOpen, ScrollText, Globe, StickyNote, Plus, Settings, Trash2, Edit3, ChevronUp, ChevronDown, X, MessageCircle, Send } from 'lucide-react';
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { ArrowLeft, BookOpen, ScrollText, Globe, StickyNote, Plus, Settings, Trash2, Edit3, GripVertical, X, MessageCircle, Send, Download, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useNovelShelfStore } from '@/lib/store';
-import { novelsApi, chaptersApi, charactersApi, loreApi, commentsApi, type NovelDetail, type CommentWithUser } from '@/lib/api';
+import { novelsApi, chaptersApi, charactersApi, loreApi, commentsApi, exportApi, type NovelDetail, type ChapterWithPOV, type CommentWithUser } from '@/lib/api';
 import { parsePOVTheme } from '@/lib/types';
 import { EmptyState } from './EmptyState';
 import { toast } from 'sonner';
@@ -23,6 +32,8 @@ export function NovelDetailPage() {
   const [editingNovel, setEditingNovel] = useState(false);
   const [editForm, setEditForm] = useState({ title: '', description: '', genre: '' });
   const [commentText, setCommentText] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const loadNovel = useCallback(async () => {
     if (!selectedNovelId) return;
@@ -40,39 +51,38 @@ export function NovelDetailPage() {
 
   const isOwner = user && novel && (novel.userId === user.id || user.role === 'ADMIN');
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  if (!novel) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Novel tidak ditemukan</p>
-      </div>
-    );
-  }
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    if (!novel) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-  const novelChapters = novel.chapters.sort((a, b) => a.order - b.order);
-  const novelCharacters = novel.characters;
-  const novelLore = novel.loreEntries;
-  const filteredLore = loreCategory === 'all' ? novelLore : novelLore.filter((l) => l.category === loreCategory);
+    const novelChapters = novel.chapters.sort((a, b) => a.order - b.order);
+    const oldIndex = novelChapters.findIndex((c) => c.id === active.id);
+    const newIndex = novelChapters.findIndex((c) => c.id === over.id);
 
-  const handleMoveChapter = async (chapterId: string, direction: 'up' | 'down') => {
-    const idx = novelChapters.findIndex((c) => c.id === chapterId);
-    if (direction === 'up' && idx > 0) {
-      await chaptersApi.update(chapterId, { order: novelChapters[idx - 1].order });
-      await chaptersApi.update(novelChapters[idx - 1].id, { order: novelChapters[idx].order });
-      loadNovel();
-    } else if (direction === 'down' && idx < novelChapters.length - 1) {
-      await chaptersApi.update(chapterId, { order: novelChapters[idx + 1].order });
-      await chaptersApi.update(novelChapters[idx + 1].id, { order: novelChapters[idx].order });
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(novelChapters, oldIndex, newIndex);
+
+    // Update local state immediately
+    setNovel({ ...novel, chapters: reordered });
+
+    // Update orders via API
+    try {
+      const updates = reordered.map((ch, idx) =>
+        chaptersApi.update(ch.id, { order: idx })
+      );
+      await Promise.all(updates);
+    } catch {
+      toast.error('Gagal menyimpan urutan');
       loadNovel();
     }
-  };
+  }, [novel, loadNovel]);
 
   const handleDeleteChapter = async (id: string) => {
     await chaptersApi.delete(id);
@@ -112,6 +122,40 @@ export function NovelDetailPage() {
     loadNovel();
     toast.success('Komentar dihapus');
   };
+
+  const handleExport = async (format: 'epub' | 'pdf') => {
+    setExporting(true);
+    setShowExportMenu(false);
+    try {
+      await exportApi.novel(novel.id, format);
+      toast.success(`Berhasil mengekspor ${format.toUpperCase()}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Gagal mengekspor');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!novel) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Novel tidak ditemukan</p>
+      </div>
+    );
+  }
+
+  const novelChapters = novel.chapters.sort((a, b) => a.order - b.order);
+  const novelCharacters = novel.characters;
+  const novelLore = novel.loreEntries;
+  const filteredLore = loreCategory === 'all' ? novelLore : novelLore.filter((l) => l.category === loreCategory);
 
   const categoryIcons: Record<string, React.ReactNode> = {
     character: <BookOpen className="w-3.5 h-3.5" />,
@@ -182,42 +226,44 @@ export function NovelDetailPage() {
             </div>
             {novelChapters.length === 0 ? (
               <EmptyState icon={<ScrollText className="w-10 h-10 text-primary" />} title="Belum Ada Bab" description="Mulai tulis ceritamu!" actionLabel="Tambah Bab" onAction={() => navigate('add-chapter', novel.id)} />
+            ) : isOwner ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={novelChapters.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {novelChapters.map((chapter, i) => (
+                      <SortableChapterItem
+                        key={chapter.id}
+                        chapter={chapter}
+                        index={i}
+                        isOwner={!!isOwner}
+                        confirmDelete={confirmDelete}
+                        setConfirmDelete={setConfirmDelete}
+                        onDelete={handleDeleteChapter}
+                        onNavigate={() => navigate('reader', novel.id, chapter.id)}
+                        onEdit={() => navigate('chapter-editor', novel.id, chapter.id)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             ) : (
               <div className="space-y-2">
                 {novelChapters.map((chapter, i) => {
                   const povChar = chapter.povCharacter;
                   return (
-                    <motion.div key={chapter.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <button onClick={() => navigate('reader', novel.id, chapter.id)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-card hover:bg-muted/50 transition-colors text-left border border-border/50">
-                          <span className="text-xs font-mono text-muted-foreground w-6 text-center">{i + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground line-clamp-1">{chapter.title}</p>
-                            {povChar && (
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: povChar.avatarColor }} />
-                                <span className="text-[10px] text-muted-foreground">POV {povChar.name}</span>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      </div>
-                      {isOwner && (
-                        <>
-                          <div className="flex flex-col gap-0.5">
-                            <button onClick={() => handleMoveChapter(chapter.id, 'up')} disabled={i === 0} className="p-1 rounded hover:bg-muted disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                            <button onClick={() => handleMoveChapter(chapter.id, 'down')} disabled={i === novelChapters.length - 1} className="p-1 rounded hover:bg-muted disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
-                          </div>
-                          {confirmDelete === chapter.id ? (
-                            <div className="flex gap-1">
-                              <button onClick={() => handleDeleteChapter(chapter.id)} className="p-1.5 rounded bg-destructive/10 text-destructive text-[10px]">Hapus</button>
-                              <button onClick={() => setConfirmDelete(null)} className="p-1.5 rounded bg-muted text-[10px]">Batal</button>
+                    <motion.div key={chapter.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                      <button onClick={() => navigate('reader', novel.id, chapter.id)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-card hover:bg-muted/50 transition-colors text-left border border-border/50">
+                        <span className="text-xs font-mono text-muted-foreground w-6 text-center">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground line-clamp-1">{chapter.title}</p>
+                          {povChar && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: povChar.avatarColor }} />
+                              <span className="text-[10px] text-muted-foreground">POV {povChar.name}</span>
                             </div>
-                          ) : (
-                            <button onClick={() => setConfirmDelete(chapter.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
                           )}
-                        </>
-                      )}
+                        </div>
+                      </button>
                     </motion.div>
                   );
                 })}
@@ -252,16 +298,20 @@ export function NovelDetailPage() {
               </div>
             )}
             {novelLore.length > 0 && (
-              <Button variant="outline" className="w-full mt-4 gap-2" onClick={() => navigate('lorebook', novel.id)}>
-                <Globe className="w-4 h-4" /> Buka Lore Book Lengkap
-              </Button>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => navigate('lorebook', novel.id)}>
+                  <Globe className="w-4 h-4" /> Buka Lore Book
+                </Button>
+                <Button variant="outline" className="gap-2" onClick={() => navigate('lore-map', novel.id)}>
+                  <Globe className="w-4 h-4" /> Peta Lore
+                </Button>
+              </div>
             )}
           </TabsContent>
 
           {/* Comments Tab */}
           <TabsContent value="comments" className="mt-4">
             <h3 className="text-sm font-semibold mb-3">Komentar ({novel.comments.length})</h3>
-            {/* Comment input */}
             {user && (
               <div className="flex gap-2 mb-4">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ backgroundColor: user.avatarColor }}>
@@ -284,7 +334,7 @@ export function NovelDetailPage() {
             {novel.comments.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Belum ada komentar. Jadilah yang pertama!</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {novel.comments.map((comment) => (
                   <div key={comment.id} className="flex gap-3 p-3 rounded-xl bg-card border border-border/50">
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ backgroundColor: comment.user.avatarColor }}>
@@ -329,6 +379,48 @@ export function NovelDetailPage() {
                   />
                 </div>
               </div>
+
+              {/* Export */}
+              <div className="p-4 rounded-xl bg-card border border-border/50">
+                <h3 className="text-sm font-semibold mb-3">Ekspor Novel</h3>
+                <div className="flex gap-2 relative">
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-2"
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    disabled={exporting}
+                  >
+                    <Download className="w-4 h-4" />
+                    {exporting ? 'Mengekspor...' : 'Ekspor'}
+                  </Button>
+                  <AnimatePresence>
+                    {showExportMenu && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute top-full mt-1 left-0 right-0 bg-card border border-border/50 rounded-xl shadow-lg overflow-hidden z-10"
+                      >
+                        <button onClick={() => handleExport('epub')} className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left">
+                          <FileText className="w-4 h-4 text-primary" />
+                          <div>
+                            <p className="text-sm font-medium">EPUB</p>
+                            <p className="text-[10px] text-muted-foreground">Format buku digital</p>
+                          </div>
+                        </button>
+                        <button onClick={() => handleExport('pdf')} className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left border-t border-border/50">
+                          <FileText className="w-4 h-4 text-primary" />
+                          <div>
+                            <p className="text-sm font-medium">PDF</p>
+                            <p className="text-[10px] text-muted-foreground">Format dokumen cetak</p>
+                          </div>
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
               <div className="p-4 rounded-xl bg-card border border-border/50">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold">Karakter & POV Tema</h3>
@@ -400,6 +492,70 @@ export function NovelDetailPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// Sortable Chapter Item
+function SortableChapterItem({ chapter, index, isOwner, confirmDelete, setConfirmDelete, onDelete, onNavigate, onEdit }: {
+  chapter: ChapterWithPOV;
+  index: number;
+  isOwner: boolean;
+  confirmDelete: string | null;
+  setConfirmDelete: (id: string | null) => void;
+  onDelete: (id: string) => void;
+  onNavigate: () => void;
+  onEdit: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: chapter.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const povChar = chapter.povCharacter;
+
+  return (
+    <motion.div ref={setNodeRef} style={style} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} className="flex items-center gap-2">
+      {isOwner && (
+        <button {...attributes} {...listeners} className="p-1.5 rounded-lg hover:bg-muted cursor-grab active:cursor-grabbing touch-none">
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </button>
+      )}
+      <div className="flex-1">
+        <button onClick={onNavigate} className="w-full flex items-center gap-3 p-3 rounded-xl bg-card hover:bg-muted/50 transition-colors text-left border border-border/50">
+          <span className="text-xs font-mono text-muted-foreground w-6 text-center">{index + 1}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground line-clamp-1">{chapter.title}</p>
+            {povChar && (
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: povChar.avatarColor }} />
+                <span className="text-[10px] text-muted-foreground">POV {povChar.name}</span>
+              </div>
+            )}
+          </div>
+        </button>
+      </div>
+      {isOwner && (
+        <div className="flex items-center gap-1">
+          <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground" title="Edit bab">
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+          {confirmDelete === chapter.id ? (
+            <div className="flex gap-1">
+              <button onClick={() => onDelete(chapter.id)} className="p-1.5 rounded bg-destructive/10 text-destructive text-[10px]">Hapus</button>
+              <button onClick={() => setConfirmDelete(null)} className="p-1.5 rounded bg-muted text-[10px]">Batal</button>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(chapter.id)} className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }
 

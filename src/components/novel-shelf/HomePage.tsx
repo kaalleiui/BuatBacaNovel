@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, ChevronRight, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronRight, Sparkles, Play } from 'lucide-react';
 import { useNovelShelfStore } from '@/lib/store';
-import { novelsApi, type NovelWithUser } from '@/lib/api';
+import { novelsApi, progressApi, type NovelWithUser, type ReadingProgressType } from '@/lib/api';
 import { EmptyState } from './EmptyState';
 
 export function HomePage() {
   const { navigate, user } = useNovelShelfStore();
   const [novels, setNovels] = useState<NovelWithUser[]>([]);
+  const [readingProgress, setReadingProgress] = useState<ReadingProgressType[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,10 +18,20 @@ export function HomePage() {
       .then((data) => setNovels(data.novels))
       .catch(() => setNovels([]))
       .finally(() => setLoading(false));
+
+    progressApi.getAll()
+      .then((data) => setReadingProgress(data.progress))
+      .catch(() => setReadingProgress([]));
   }, []);
 
   const recentNovels = novels.slice(0, 6);
   const totalChapters = novels.reduce((sum, n) => sum + (n._count?.chapters || 0), 0);
+
+  // Get novels with reading progress for "Lanjut Baca" section
+  const continueReading = readingProgress
+    .filter((p) => p.progress > 0 && p.novel)
+    .sort((a, b) => new Date(b.lastReadAt).getTime() - new Date(a.lastReadAt).getTime())
+    .slice(0, 6);
 
   if (loading) {
     return (
@@ -76,10 +87,62 @@ export function HomePage() {
       ) : (
         <>
           {/* Lanjut Baca */}
-          {recentNovels.length > 0 && (
+          {continueReading.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center justify-between px-5 mb-3">
                 <h2 className="text-lg font-semibold text-foreground">Lanjut Baca</h2>
+              </div>
+              <div className="flex gap-4 px-5 overflow-x-auto pb-2 scrollbar-hide">
+                {continueReading.map((rp, i) => (
+                  <motion.button
+                    key={rp.id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    onClick={() => navigate('reader', rp.novelId, rp.chapterId)}
+                    className="flex-shrink-0 group"
+                  >
+                    <div className="w-28">
+                      <div
+                        className="w-28 h-40 rounded-xl shadow-md group-hover:shadow-lg transition-shadow overflow-hidden relative"
+                        style={{ backgroundColor: rp.novel?.coverColor || '#C67B3C' }}
+                      >
+                        {rp.novel?.coverImage ? (
+                          <img src={rp.novel.coverImage} alt={rp.novel.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center p-3">
+                            <span className="text-white/90 font-bold text-center text-sm leading-tight line-clamp-3 drop-shadow-md">
+                              {rp.novel?.title}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute left-0 top-0 bottom-0 w-2 bg-black/10 rounded-l-xl" />
+                        {/* Progress overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm p-2">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Play className="w-3 h-3 text-white" />
+                            <span className="text-[10px] text-white font-medium">{Math.round(rp.progress)}% dibaca</span>
+                          </div>
+                          <div className="h-1 w-full rounded-full bg-white/20">
+                            <div className="h-full rounded-full bg-white" style={{ width: `${rp.progress}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-xs font-medium text-foreground mt-2 line-clamp-1 text-left">
+                        {rp.novel?.title}
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Semua Novel */}
+          {recentNovels.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between px-5 mb-3">
+                <h2 className="text-lg font-semibold text-foreground">Novel Terbaru</h2>
                 <button
                   onClick={() => navigate('bookshelf')}
                   className="text-sm text-primary font-medium flex items-center gap-1"
@@ -127,9 +190,9 @@ export function HomePage() {
             </div>
           )}
 
-          {/* Novel Terbaru Grid */}
+          {/* Grid view */}
           <div className="px-5">
-            <h2 className="text-lg font-semibold text-foreground mb-3">Novel Terbaru</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">Koleksi</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {recentNovels.map((novel, i) => (
                 <motion.button

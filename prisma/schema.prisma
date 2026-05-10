@@ -26,8 +26,11 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  novels    Novel[]
-  comments  Comment[]
+  novels           Novel[]
+  comments         Comment[]
+  readingProgress  ReadingProgress[]
+  highlights       Highlight[]
+  readerSettings   ReaderSettings?
 
   @@map("users")
 }
@@ -55,10 +58,11 @@ model Novel {
   userId     String     @map("user_id")
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  chapters   Chapter[]
-  characters Character[]
-  loreEntries LoreEntry[]
-  comments   Comment[]
+  chapters        Chapter[]
+  characters      Character[]
+  loreEntries     LoreEntry[]
+  comments        Comment[]
+  readingProgress ReadingProgress[]
 
   @@map("novels")
 }
@@ -79,6 +83,10 @@ model Chapter {
 
   povCharacterId  String?  @map("pov_character_id")
   povCharacter    Character? @relation(fields: [povCharacterId], references: [id], onDelete: SetNull)
+
+  versions     ChapterVersion[]
+  highlights   Highlight[]
+  outlineItems OutlineItem[]
 
   @@map("chapters")
 }
@@ -146,4 +154,103 @@ model Comment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("comments")
+}
+
+// ============================================
+// CHAPTER VERSION (Version History)
+// ============================================
+
+model ChapterVersion {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @default("")
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+
+  chapterId String  @map("chapter_id")
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@map("chapter_versions")
+}
+
+// ============================================
+// READING PROGRESS (Progress Tracking)
+// ============================================
+
+model ReadingProgress {
+  id         String   @id @default(cuid())
+  progress   Float    @default(0) // 0-100 percentage
+  lastReadAt DateTime @default(now())
+
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  novelId    String   @map("novel_id")
+  novel      Novel    @relation(fields: [novelId], references: [id], onDelete: Cascade)
+
+  chapterId  String?  @map("chapter_id")
+
+  @@unique([userId, novelId])
+  @@map("reading_progress")
+}
+
+// ============================================
+// HIGHLIGHT & ANNOTATION
+// ============================================
+
+model Highlight {
+  id          String   @id @default(cuid())
+  text        String   // selected text content
+  startOffset Int      // character offset start
+  endOffset   Int      // character offset end
+  color       String   @default("#F59E0B") // highlight color
+  note        String?  // annotation note
+  createdAt   DateTime @default(now())
+
+  chapterId   String  @map("chapter_id")
+  chapter     Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  userId      String  @map("user_id")
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("highlights")
+}
+
+// ============================================
+// OUTLINE ITEM (Outline Mode)
+// ============================================
+
+model OutlineItem {
+  id        String   @id @default(cuid())
+  content   String
+  order     Int      @default(0)
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  chapterId String  @map("chapter_id")
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@map("outline_items")
+}
+
+// ============================================
+// READER SETTINGS (Font & Theme Preferences)
+// ============================================
+
+model ReaderSettings {
+  id          String  @id @default(cuid())
+  userId      String  @map("user_id") @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fontSize    Int     @default(18) // px
+  fontFamily  String  @default("serif") // serif, sans, mono
+  lineHeight  String  @default("relaxed") // compact, normal, relaxed
+  pageMargin  Int     @default(20) // px
+  theme       String  @default("classic") // classic, dark, sepia, custom
+  // Custom theme colors (JSON)
+  customBgColor     String  @default("#FDF6EC")
+  customTextColor   String  @default("#3D2B1F")
+  customAccentColor String  @default("#C67B3C")
+
+  @@map("reader_settings")
 }

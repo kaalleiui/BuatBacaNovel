@@ -162,3 +162,90 @@
 .page-transition {
   transition: background-color 0.5s ease, color 0.5s ease;
 }
+
+/* Tiptap Editor Styles */
+.tiptap-editor .tiptap {
+  outline: none;
+  min-height: 50vh;
+}
+
+.tiptap-editor .tiptap p.is-editor-empty:first-child::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.tiptap-editor .tiptap h1 {
+  font-size: 1.8em;
+  font-weight: 700;
+  margin: 1em 0 0.5em;
+}
+
+.tiptap-editor .tiptap h2 {
+  font-size: 1.4em;
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+}
+
+.tiptap-editor .tiptap h3 {
+  font-size: 1.2em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+
+.tiptap-editor .tiptap p {
+  margin: 0.5em 0;
+}
+
+.tiptap-editor .tiptap blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 1em;
+  margin-left: 0;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+
+.tiptap-editor .tiptap ul,
+.tiptap-editor .tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.tiptap-editor .tiptap ul {
+  list-style-type: disc;
+}
+
+.tiptap-editor .tiptap ol {
+  list-style-type: decimal;
+}
+
+.tiptap-editor .tiptap li {
+  margin: 0.25em 0;
+}
+
+.tiptap-editor .tiptap a {
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tiptap-editor .tiptap mark {
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.tiptap-editor .tiptap u {
+  text-decoration: underline;
+}
+
+/* Hide scrollbar for horizontal scroll areas */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

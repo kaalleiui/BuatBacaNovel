@@ -199,6 +199,127 @@ export const uploadApi = {
 };
 
 // ============================
+// READING PROGRESS
+// ============================
+
+export const progressApi = {
+  get: (novelId: string) =>
+    apiFetch<{ progress: ReadingProgressType | null }>(`/api/progress?novelId=${novelId}`),
+
+  getAll: () =>
+    apiFetch<{ progress: ReadingProgressType[] }>('/api/progress/all'),
+
+  upsert: (data: { novelId: string; chapterId?: string; progress: number }) =>
+    apiFetch<{ progress: ReadingProgressType }>('/api/progress', { method: 'PUT', body: data }),
+};
+
+// ============================
+// HIGHLIGHTS
+// ============================
+
+export const highlightsApi = {
+  list: (chapterId: string) =>
+    apiFetch<{ highlights: HighlightType[] }>(`/api/highlights?chapterId=${chapterId}`),
+
+  create: (data: { chapterId: string; text: string; startOffset: number; endOffset: number; color?: string; note?: string }) =>
+    apiFetch<{ highlight: HighlightType }>('/api/highlights', { method: 'POST', body: data }),
+
+  update: (id: string, data: { color?: string; note?: string }) =>
+    apiFetch<{ highlight: HighlightType }>(`/api/highlights/${id}`, { method: 'PUT', body: data }),
+
+  delete: (id: string) =>
+    apiFetch<{ success: boolean }>(`/api/highlights/${id}`, { method: 'DELETE' }),
+};
+
+// ============================
+// CHAPTER VERSIONS
+// ============================
+
+export const versionsApi = {
+  list: (chapterId: string) =>
+    apiFetch<{ versions: ChapterVersionType[] }>(`/api/versions?chapterId=${chapterId}`),
+
+  restore: (id: string) =>
+    apiFetch<{ chapter: ChapterWithPOV; version: ChapterVersionType }>(`/api/versions/${id}`, { method: 'POST' }),
+};
+
+// ============================
+// OUTLINE
+// ============================
+
+export const outlineApi = {
+  list: (chapterId: string) =>
+    apiFetch<{ items: OutlineItemType[] }>(`/api/outline?chapterId=${chapterId}`),
+
+  create: (data: { chapterId: string; content: string; order?: number }) =>
+    apiFetch<{ item: OutlineItemType }>('/api/outline', { method: 'POST', body: data }),
+
+  update: (id: string, data: { content?: string; order?: number; completed?: boolean }) =>
+    apiFetch<{ item: OutlineItemType }>(`/api/outline/${id}`, { method: 'PUT', body: data }),
+
+  delete: (id: string) =>
+    apiFetch<{ success: boolean }>(`/api/outline/${id}`, { method: 'DELETE' }),
+};
+
+// ============================
+// READER SETTINGS
+// ============================
+
+export const settingsApi = {
+  get: () =>
+    apiFetch<{ settings: ReaderSettingsType | null }>('/api/settings'),
+
+  upsert: (data: Partial<ReaderSettingsUpdateInput>) =>
+    apiFetch<{ settings: ReaderSettingsType }>('/api/settings', { method: 'PUT', body: data }),
+};
+
+// ============================
+// EXPORT
+// ============================
+
+export const exportApi = {
+  novel: async (novelId: string, format: 'epub' | 'pdf') => {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ novelId, format }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Gagal mengekspor');
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `novel.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+};
+
+// ============================
+// AI
+// ============================
+
+export const aiApi = {
+  stream: async (type: 'assist' | 'summary' | 'consistency', prompt: string, context?: string) => {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, prompt, context }),
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Gagal menghubungi AI');
+    }
+    return res;
+  },
+};
+
+// ============================
 // TYPES
 // ============================
 
@@ -311,3 +432,68 @@ export interface LoreCreateInput {
 }
 
 export type LoreUpdateInput = Partial<LoreCreateInput>;
+
+// New types for v3.0
+export interface ReadingProgressType {
+  id: string;
+  progress: number;
+  lastReadAt: string;
+  userId: string;
+  novelId: string;
+  chapterId: string | null;
+  novel?: { id: string; title: string; coverColor: string; coverImage: string | null };
+}
+
+export interface HighlightType {
+  id: string;
+  text: string;
+  startOffset: number;
+  endOffset: number;
+  color: string;
+  note: string | null;
+  createdAt: string;
+  chapterId: string;
+  userId: string;
+}
+
+export interface ChapterVersionType {
+  id: string;
+  title: string;
+  content: string;
+  version: number;
+  createdAt: string;
+  chapterId: string;
+}
+
+export interface OutlineItemType {
+  id: string;
+  content: string;
+  order: number;
+  completed: boolean;
+  createdAt: string;
+  chapterId: string;
+}
+
+export interface ReaderSettingsType {
+  id: string;
+  userId: string;
+  fontSize: number;
+  fontFamily: string;
+  lineHeight: string;
+  pageMargin: number;
+  theme: string;
+  customBgColor: string;
+  customTextColor: string;
+  customAccentColor: string;
+}
+
+export interface ReaderSettingsUpdateInput {
+  fontSize?: number;
+  fontFamily?: string;
+  lineHeight?: string;
+  pageMargin?: number;
+  theme?: string;
+  customBgColor?: string;
+  customTextColor?: string;
+  customAccentColor?: string;
+}

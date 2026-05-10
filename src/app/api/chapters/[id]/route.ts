@@ -35,6 +35,25 @@ export async function PUT(
     }
 
     const body = await req.json();
+
+    // Create a version history entry before updating (only if content or title changes)
+    if (body.content !== undefined || body.title !== undefined) {
+      const maxVersion = await db.chapterVersion.findFirst({
+        where: { chapterId: id },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+
+      await db.chapterVersion.create({
+        data: {
+          chapterId: id,
+          title: chapter.title,
+          content: chapter.content,
+          version: (maxVersion?.version ?? 0) + 1,
+        },
+      });
+    }
+
     const updated = await db.chapter.update({
       where: { id },
       data: {

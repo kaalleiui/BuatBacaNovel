@@ -20,6 +20,19 @@ interface NovelShelfStore {
   user: AuthUser | null;
   setUser: (user: AuthUser | null) => void;
   isAuthenticated: boolean;
+
+  // Reader settings (local cache)
+  readerSettings: {
+    fontSize: number;
+    fontFamily: string;
+    lineHeight: string;
+    pageMargin: number;
+    theme: string;
+    customBgColor: string;
+    customTextColor: string;
+    customAccentColor: string;
+  } | null;
+  setReaderSettings: (settings: NovelShelfStore['readerSettings']) => void;
 }
 
 export const useNovelShelfStore = create<NovelShelfStore>()(
@@ -40,12 +53,16 @@ export const useNovelShelfStore = create<NovelShelfStore>()(
       user: null,
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       isAuthenticated: false,
+
+      readerSettings: null,
+      setReaderSettings: (settings) => set({ readerSettings: settings }),
     }),
     {
       name: 'novelshelf-session',
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        readerSettings: state.readerSettings,
       }),
     }
   )
