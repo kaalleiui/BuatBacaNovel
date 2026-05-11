@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, BookOpen, FileText, PenTool, ChevronRight, LogOut } from 'lucide-react';
+import { User, BookOpen, FileText, PenTool, ChevronRight, LogOut, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNovelShelfStore } from '@/lib/store';
@@ -85,7 +85,21 @@ export function ProfilePage() {
       </div>
 
       {/* Logout */}
-      <div className="px-5">
+      <div className="px-5 space-y-3">
+        <button
+          onClick={() => navigate('ai-setup')}
+          className="w-full flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-4.5 h-4.5 text-primary" />
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold">Panduan Setup AI</p>
+            <p className="text-[10px] text-muted-foreground">Hubungkan dengan LM Studio untuk fitur AI</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
+
         <Button variant="outline" className="w-full gap-2" onClick={handleLogout}>
           <LogOut className="w-4 h-4" />
           Keluar

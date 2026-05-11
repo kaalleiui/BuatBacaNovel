@@ -109,6 +109,7 @@ export type AppView =
   | 'lorebook'
   | 'lore-map'
   | 'profile'
+  | 'ai-setup'
   | 'add-novel'
   | 'add-chapter'
   | 'chapter-editor'

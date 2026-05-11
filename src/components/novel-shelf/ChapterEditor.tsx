@@ -453,6 +453,7 @@ function AIAssistantPanel({ chapterContent, onClose, onInsert, novelId }: {
   onInsert: (text: string) => void;
   novelId: string;
 }) {
+  const { navigate } = useNovelShelfStore();
   const [mode, setMode] = useState<'assist' | 'summary' | 'consistency'>('assist');
   const [prompt, setPrompt] = useState('');
   const [response, setResponse] = useState('');
@@ -573,7 +574,17 @@ function AIAssistantPanel({ chapterContent, onClose, onInsert, novelId }: {
         </Button>
       </div>
 
-      {error && <p className="text-xs text-destructive mt-3 p-2 rounded-lg bg-destructive/10">{error}</p>}
+      {error && (
+        <div className="text-xs text-destructive mt-3 p-3 rounded-lg bg-destructive/10 space-y-2">
+          <p>{error}</p>
+          <button
+            onClick={() => { onClose(); navigate('ai-setup'); }}
+            className="flex items-center gap-1 text-primary hover:underline text-[11px] font-medium"
+          >
+            <Sparkles className="w-3 h-3" /> Lihat Panduan Setup AI
+          </button>
+        </div>
+      )}
 
       {response && (
         <div className="mt-3 p-3 rounded-lg bg-muted/30 border border-border/50">

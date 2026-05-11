@@ -18,6 +18,7 @@ import { AddChapterModal } from './AddChapterModal';
 import { AddLoreModal } from './AddLoreModal';
 import { CharacterEditorModal } from './CharacterEditorModal';
 import { ChapterEditor } from './ChapterEditor';
+import { AISetupTutorial } from './AISetupTutorial';
 import { Toaster } from 'sonner';
 
 const pageVariants = {
@@ -67,7 +68,7 @@ export function AppShell() {
     );
   }
 
-  const showBottomNav = !['reader', 'add-novel', 'add-chapter', 'chapter-editor', 'add-lore', 'edit-character', 'login', 'register', 'lore-map'].includes(currentView);
+  const showBottomNav = !['reader', 'add-novel', 'add-chapter', 'chapter-editor', 'add-lore', 'edit-character', 'login', 'register', 'lore-map', 'ai-setup'].includes(currentView);
 
   const renderView = () => {
     switch (currentView) {
@@ -87,6 +88,8 @@ export function AppShell() {
         return <ChapterEditor />;
       case 'profile':
         return <ProfilePage />;
+      case 'ai-setup':
+        return <AISetupTutorial />;
       case 'login':
         return <LoginPage />;
       case 'register':
