@@ -10,6 +10,7 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
   const { body, ...rest } = options;
 
   const res = await fetch(`${BASE_URL}${path}`, {
+    credentials: 'same-origin',
     ...rest,
     headers: {
       'Content-Type': 'application/json',
