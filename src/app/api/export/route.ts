@@ -56,9 +56,10 @@ async function exportEpub(novel: {
   user: { nickname: string };
 }) {
   try {
-    const EPub = (await import('epub-gen-memory')).default;
+    const epubModule = await import('epub-gen-memory');
+    const EPub = epubModule.default || epubModule.EPub;
 
-    const chapters = novel.chapters.map((ch) => ({
+    const content = novel.chapters.map((ch) => ({
       title: ch.title,
       content: ch.content || '<p><em>Belum ada konten</em></p>',
     }));
@@ -67,12 +68,14 @@ async function exportEpub(novel: {
       title: novel.title,
       author: novel.user.nickname,
       description: novel.description || undefined,
-      chapters,
     };
 
-    const buffer = await EPub(epubOptions);
+    const buffer = await EPub(epubOptions, content);
 
-    return new NextResponse(Buffer.from(buffer), {
+    // EPub default export returns a Buffer directly
+    const outputBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer as ArrayBuffer);
+
+    return new NextResponse(outputBuffer, {
       headers: {
         'Content-Type': 'application/epub+zip',
         'Content-Disposition': `attachment; filename="${novel.title.replace(/[^a-zA-Z0-9]/g, '_')}.epub"`,
@@ -90,17 +93,37 @@ async function exportPdf(novel: {
   user: { nickname: string };
 }) {
   try {
-    const PDFDocument = (await import('pdfkit')).default;
+    const path = await import('path');
+    const pdfkitModule = await import('pdfkit');
+    const PDFDocument = pdfkitModule.default;
 
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const chunks: Buffer[] = [];
 
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    // Use system TTF font to bypass pdfkit's __dirname issue with AFM fonts
+    // Noto Sans is available on this system
+    const notoSansRegular = '/usr/share/fonts/truetype/english/Carlito-Regular.ttf';
+    const notoSansBold = '/usr/share/fonts/truetype/english/Carlito-Bold.ttf';
+
+    let fontRegular = 'Helvetica';
+    let fontBold = 'Helvetica-Bold';
+
+    // Try to register TTF fonts (fall back to built-in if not available)
+    try {
+      const fs = await import('fs');
+      if (fs.existsSync(notoSansRegular)) {
+        doc.registerFont('CustomRegular', notoSansRegular);
+        doc.registerFont('CustomBold', notoSansBold);
+        fontRegular = 'CustomRegular';
+        fontBold = 'CustomBold';
+      }
+    } catch {
+      // Fall back to Helvetica
+    }
 
     // Title page
-    doc.fontSize(28).text(novel.title, { align: 'center' });
+    doc.font(fontBold).fontSize(28).text(novel.title, { align: 'center' });
     doc.moveDown();
-    doc.fontSize(14).text(`oleh ${novel.user.nickname}`, { align: 'center' });
+    doc.font(fontRegular).fontSize(14).text(`oleh ${novel.user.nickname}`, { align: 'center' });
     if (novel.description) {
       doc.moveDown();
       doc.fontSize(11).text(novel.description, { align: 'center' });
@@ -110,30 +133,32 @@ async function exportPdf(novel: {
     // Chapters
     for (const chapter of novel.chapters) {
       doc.addPage();
-      doc.fontSize(20).text(chapter.title, { align: 'center' });
+      doc.font(fontBold).fontSize(20).text(chapter.title, { align: 'center' });
       doc.moveDown();
       // Strip HTML tags for PDF
       const plainContent = chapter.content
         ? chapter.content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         : 'Belum ada konten';
-      doc.fontSize(12).text(plainContent, { align: 'justify', lineGap: 4 });
+      doc.font(fontRegular).fontSize(12).text(plainContent, { align: 'justify', lineGap: 4 });
     }
 
     doc.end();
 
-    return new Promise<NextResponse>((resolve) => {
-      doc.on('end', () => {
-        const buffer = Buffer.concat(chunks);
-        resolve(new NextResponse(buffer, {
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="${novel.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`,
-          },
-        }));
-      });
+    // Collect all chunks and wait for the stream to finish
+    const chunks: Buffer[] = [];
+    for await (const chunk of doc as AsyncIterable<Buffer>) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${novel.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`,
+      },
     });
   } catch (error) {
-    console.error('PDF export error:', error);
+    console.error('PDF export error:', error instanceof Error ? error.message : String(error));
     return NextResponse.json({ error: 'Gagal mengekspor PDF' }, { status: 500 });
   }
 }

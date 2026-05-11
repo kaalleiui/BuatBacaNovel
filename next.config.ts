@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  serverExternalPackages: ['pdfkit', 'epub-gen-memory'],
 };
 
 export default nextConfig;
